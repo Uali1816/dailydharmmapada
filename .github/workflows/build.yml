@@ -14,17 +14,32 @@ jobs:
       - uses: actions/checkout@v4
       - name: Unpack
         run: |
-          Z=$(ls *.zip 2>/dev/null | head -1)
-          if [ -n "$Z" ]; then
-            echo "Found archive: $Z"
-            unzip -q -o "$Z" -d src
-          fi
-          S=$(find . -name settings.gradle -not -path "*/build/*" | head -1)
-          if [ -z "$S" ]; then
-            echo "ERROR: project not found. Upload Dhammapada.zip to the repository."
+          echo "=== Files in repository ==="
+          ls -la
+          ZIPS=$(ls *.zip 2>/dev/null | wc -l)
+          if [ "$ZIPS" -gt 1 ]; then
+            echo "ERROR: more than one zip. Delete old ones, keep only the newest:"
+            ls -la *.zip
             exit 1
           fi
-          echo "PROJ=$(dirname "$S")" >> $GITHUB_ENV
+          if [ "$ZIPS" -eq 1 ]; then
+            Z=$(ls *.zip)
+            echo "Using archive: $Z"
+            rm -rf src
+            unzip -q -o "$Z" -d src
+            S=$(find src -name settings.gradle | head -1)
+          else
+            S=$(find . -name settings.gradle -not -path "*/build/*" | head -1)
+          fi
+          if [ -z "$S" ]; then
+            echo "ERROR: project not found. Upload Dhammapada.zip."
+            exit 1
+          fi
+          P=$(dirname "$S")
+          V=$(grep -oP "versionName '\K[^']+" "$P/app/build.gradle")
+          echo "=== Project: $P   Version: $V ==="
+          echo "PROJ=$P" >> $GITHUB_ENV
+          echo "VER=$V" >> $GITHUB_ENV
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -36,9 +51,9 @@ jobs:
         working-directory: ${{ env.PROJ }}
         run: gradle assembleDebug --no-daemon
       - name: Rename
-        run: cp ${{ env.PROJ }}/app/build/outputs/apk/debug/app-debug.apk Dhammapada.apk
+        run: cp ${{ env.PROJ }}/app/build/outputs/apk/debug/app-debug.apk Dhammapada-${{ env.VER }}.apk
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1-${{ github.run_number }}
-          name: Dhammapada ${{ github.run_number }}
-          files: Dhammapada.apk
+          tag_name: v${{ env.VER }}-${{ github.run_number }}
+          name: Dhammapada ${{ env.VER }} (build ${{ github.run_number }})
+          files: Dhammapada-*.apk
