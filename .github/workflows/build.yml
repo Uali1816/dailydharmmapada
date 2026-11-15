@@ -14,12 +14,17 @@ jobs:
       - uses: actions/checkout@v4
       - name: Unpack
         run: |
-          if [ -f Dhammapada.zip ]; then
-            unzip -q -o Dhammapada.zip -d src
-            echo "PROJ=src/Dhammapada" >> $GITHUB_ENV
-          else
-            echo "PROJ=." >> $GITHUB_ENV
+          Z=$(ls *.zip 2>/dev/null | head -1)
+          if [ -n "$Z" ]; then
+            echo "Found archive: $Z"
+            unzip -q -o "$Z" -d src
           fi
+          S=$(find . -name settings.gradle -not -path "*/build/*" | head -1)
+          if [ -z "$S" ]; then
+            echo "ERROR: project not found. Upload Dhammapada.zip to the repository."
+            exit 1
+          fi
+          echo "PROJ=$(dirname "$S")" >> $GITHUB_ENV
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
